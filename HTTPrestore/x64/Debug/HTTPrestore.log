@@ -1,0 +1,3 @@
+﻿  mian.cpp
+D:\Debug\HTTPrestore\HTTPrestore\HTTPrestore\mian.cpp(475,17): warning C4018: “<”: 有符号/无符号不匹配
+  HTTPrestore.vcxproj -> D:\Debug\HTTPrestore\HTTPrestore\x64\Debug\HTTPrestore.exe
