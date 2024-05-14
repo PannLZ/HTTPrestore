@@ -134,6 +134,9 @@
   <ItemGroup>
     <ClCompile Include="mian.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pheader.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
