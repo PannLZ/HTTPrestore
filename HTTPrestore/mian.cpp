@@ -8,6 +8,9 @@
 #include <string.h>
 #include <stdio.h>
 
+#include <ctype.h>
+#include <time.h>
+
 using namespace std;
 #pragma comment(lib, "wpcap.lib")
 #pragma comment(lib, "Ws2_32.lib")
@@ -20,10 +23,6 @@ using namespace std;
 //typedef unsigned int u_int;
 //typedef unsigned short  u_short;
 
-
-
-#include <ctype.h>
-#include <time.h>
 
 struct ether_header {
     u_char  ether_dhost[6];
@@ -71,6 +70,36 @@ struct tcp_header {
     u_int   op_pad;
 };
 
+struct http_session {
+    char header[4096];
+    char body[4096];
+};
+
+void parse_http(char* http_txt, struct http_session* session) 
+{
+    // 找到头部和正文的分隔符"\r\n\r\n"
+    char* separator = strstr(http_txt, "\r\n\r\n");
+    if (separator) {
+        // 复制头部信息到session->header
+        strncpy(session->header, http_txt, separator - http_txt);
+        session->header[separator - http_txt] = '\0';
+
+        // 复制正文信息到session->body
+        strcpy(session->body, separator + 4);
+    }
+    else {
+        // 如果没有找到分隔符，那么整个http_txt就是头部
+        strcpy(session->header, http_txt);
+        session->body[0] = '\0';
+    }
+}
+
+void print_http(struct http_session* session) 
+{
+    printf("Header: \n%s\n", session->header);
+    printf("Body: \n%s\n", session->body);
+}
+
 int is_readable(char c) {
     unsigned char uc = (unsigned char)c;
     if (uc > 255) {
@@ -92,6 +121,7 @@ int main() {
         fprintf(stderr, "Error in pcap_findalldevs: %s\n", errbuf);
         exit(1);
     }
+
     for (d = alldevs; d; d = d->next) {
         printf("%d. %s", ++i, d->name);
         if (d->description)
@@ -99,26 +129,39 @@ int main() {
         else
             printf(" (No description available)\n");
     }
+
     if (i == 0) {
         printf("\nNo interfaces found! Make sure WinPcap is installed.\n");
         return -1;
     }
+
     printf("Enter the interface number (1-%d):", i);
     scanf("%d", &inum);
+
     if (inum < 1 || inum > i) {
         printf("\nInterface number out of range.\n");
         pcap_freealldevs(alldevs);
         return -1;
     }
+
     for (d = alldevs, i = 0; i < inum - 1; d = d->next, i++);
-    if ((adhandle = pcap_open(d->name, 65536, PCAP_OPENFLAG_PROMISCUOUS, 1000, NULL, errbuf
+
+    if ((adhandle = pcap_open(
+        d->name, 
+        65536,
+        PCAP_OPENFLAG_PROMISCUOUS,
+        1000, 
+        NULL, 
+        errbuf
     )) == NULL) {
         fprintf(stderr, "\nUnable to open the adapter. %s is not supported by WinPcap\n", d->name);
         pcap_freealldevs(alldevs);
         return -1;
     }
     printf("\nlistening on %s...\n", d->description);
+
     pcap_freealldevs(alldevs);
+
     struct pcap_pkthdr* header;
     const u_char* pkt_data;
     int rst = 0;
@@ -127,13 +170,16 @@ int main() {
             continue;
         }
         struct ether_header* eh = (struct ether_header*)pkt_data;
+
         if (ntohs(eh->ether_type) == 0x0800) {
             struct ip_header* ih = (struct ip_header*)(pkt_data + 14);
+            
             if (ntohs(ih->proto) == 0x0600) {
                 int ip_len = ntohs(ih->tlen);
                 int find_http = 0;
                 char http_txt[1500] = "";
                 char* ip_pkt_data = (char*)ih;
+
                 for (int i = 0; i < ip_len; ++i) {
                     if (!find_http && (i + 3 < ip_len && strncmp(ip_pkt_data + i, "GET ", strlen("GET ")) == 0)
                         || (i + 4 < ip_len && strncmp(ip_pkt_data + i, "POST ", strlen("POST ")) == 0)) {
@@ -146,6 +192,7 @@ int main() {
                         strncat(http_txt, &ip_pkt_data[i], 1);
                     }
                 }
+
                 if (strcmp(http_txt, "") != 0) {
                     char timestr[16];
                     time_t local_tv_sec;
@@ -153,7 +200,11 @@ int main() {
                     struct tm* ltime = localtime(&local_tv_sec);
                     strftime(timestr, sizeof timestr, "%H:%M:%S", ltime);
                     printf("%s,%.6d len:%d\n\n", timestr, header->ts.tv_usec, header->len);
-                    printf("%s\n", http_txt);
+
+                    /*printf("%s\n", http_txt);*/
+                    struct http_session session;
+                    parse_http(http_txt, &session);
+                    print_http(&session);
                 }
             }
         }
