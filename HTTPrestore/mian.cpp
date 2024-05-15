@@ -116,7 +116,7 @@ void print_http(struct http_session* session)
         }
         else {
             // 如果Content-Type是二进制类型，打印二进制数据
-            printf("Body: ");
+            printf("Body: \n");
             for (int i = 0; session->body[i] != '\0'; ++i) {
                 printf("%02x ", (unsigned char)session->body[i]);
             }
